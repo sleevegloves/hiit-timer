@@ -8,6 +8,11 @@ export interface SavedWorkout {
   exercise_names: string[] | null;
   created_at: string;
   updated_at: string;
+  // Circuit mode fields
+  is_circuit: boolean | null;
+  exercises: number | null;
+  total_rounds: number | null;
+  round_rest_seconds: number | null;
 }
 
 export interface Database {

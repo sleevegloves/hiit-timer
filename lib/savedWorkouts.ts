@@ -37,6 +37,10 @@ export async function saveWorkout(
       rest_seconds: config.restSeconds,
       rounds: config.rounds,
       exercise_names: config.exerciseNames || null,
+      is_circuit: config.isCircuit || false,
+      exercises: config.exercises || null,
+      total_rounds: config.totalRounds || null,
+      round_rest_seconds: config.roundRestSeconds || null,
     })
     .select()
     .single();
@@ -65,6 +69,10 @@ export async function updateWorkout(
       rest_seconds: config.restSeconds,
       rounds: config.rounds,
       exercise_names: config.exerciseNames || null,
+      is_circuit: config.isCircuit || false,
+      exercises: config.exercises || null,
+      total_rounds: config.totalRounds || null,
+      round_rest_seconds: config.roundRestSeconds || null,
     })
     .eq("id", workoutId)
     .select()
@@ -96,13 +104,23 @@ export async function deleteWorkout(workoutId: string): Promise<boolean> {
 }
 
 export function savedWorkoutToConfig(saved: SavedWorkout): WorkoutConfig {
+  const isCircuit = saved.is_circuit && saved.exercises && saved.total_rounds;
+
+  const description = isCircuit
+    ? `${saved.work_seconds}s work / ${saved.rest_seconds}s rest × ${saved.exercises} 🏃 × ${saved.total_rounds} 🔄`
+    : `${saved.work_seconds}s work / ${saved.rest_seconds}s rest × ${saved.rounds}`;
+
   return {
     id: `saved-${saved.id}`,
     name: saved.name,
-    description: `${saved.work_seconds}s work / ${saved.rest_seconds}s rest × ${saved.rounds}`,
+    description,
     workSeconds: saved.work_seconds,
     restSeconds: saved.rest_seconds,
     rounds: saved.rounds,
     exerciseNames: saved.exercise_names || undefined,
+    isCircuit: saved.is_circuit || undefined,
+    exercises: saved.exercises || undefined,
+    totalRounds: saved.total_rounds || undefined,
+    roundRestSeconds: saved.round_rest_seconds || undefined,
   };
 }
