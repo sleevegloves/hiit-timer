@@ -5,12 +5,29 @@ import { Phase } from "@/hooks/useTimer";
 interface TimerDisplayProps {
   seconds: number;
   phase: Phase;
-  currentRound: number;
-  totalRounds: number;
+  currentInterval: number;
+  totalIntervals: number;
   exerciseName?: string | null;
+  // Circuit mode
+  isCircuit?: boolean;
+  currentRound?: number;
+  totalRounds?: number;
+  currentExercise?: number;
+  totalExercises?: number;
 }
 
-export function TimerDisplay({ seconds, phase, currentRound, totalRounds, exerciseName }: TimerDisplayProps) {
+export function TimerDisplay({ 
+  seconds, 
+  phase, 
+  currentInterval, 
+  totalIntervals, 
+  exerciseName,
+  isCircuit,
+  currentRound,
+  totalRounds,
+  currentExercise,
+  totalExercises,
+}: TimerDisplayProps) {
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
 
@@ -19,6 +36,7 @@ export function TimerDisplay({ seconds, phase, currentRound, totalRounds, exerci
     countdown: "Get Ready",
     work: "WORK",
     rest: "REST",
+    roundRest: "ROUND REST",
     complete: "Done!",
   }[phase];
 
@@ -27,6 +45,7 @@ export function TimerDisplay({ seconds, phase, currentRound, totalRounds, exerci
     countdown: "text-accent",
     work: "text-work",
     rest: "text-rest",
+    roundRest: "text-accent",
     complete: "text-accent",
   }[phase];
 
@@ -55,11 +74,23 @@ export function TimerDisplay({ seconds, phase, currentRound, totalRounds, exerci
       </div>
 
       {phase !== "idle" && phase !== "complete" && (
-        <span className="text-muted-foreground font-medium">
-          Round {currentRound} / {totalRounds}
-        </span>
+        <div className="text-center">
+          {isCircuit && totalRounds && totalRounds > 1 ? (
+            <>
+              <span className="text-muted-foreground font-medium block">
+                Round {currentRound} / {totalRounds}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                Exercise {currentExercise} / {totalExercises}
+              </span>
+            </>
+          ) : (
+            <span className="text-muted-foreground font-medium">
+              Round {currentInterval} / {totalIntervals}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
 }
-

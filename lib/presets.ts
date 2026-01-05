@@ -8,6 +8,11 @@ export interface WorkoutConfig {
   warmupSeconds?: number;
   cooldownSeconds?: number;
   exerciseNames?: string[];
+  // Circuit mode fields
+  isCircuit?: boolean;
+  exercises?: number;        // Number of exercises per round
+  totalRounds?: number;      // Number of times to repeat the circuit
+  roundRestSeconds?: number; // Rest between circuit rounds
 }
 
 export const PRESETS: WorkoutConfig[] = [
@@ -54,32 +59,30 @@ export const PRESETS: WorkoutConfig[] = [
     rounds: 15,
   },
   {
+    id: "circuit-1",
+    name: "Circuit 4x3",
+    description: "4 exercises × 3 rounds with 60s rest",
+    workSeconds: 45,
+    restSeconds: 15,
+    rounds: 12, // Total intervals (4 exercises × 3 rounds)
+    isCircuit: true,
+    exercises: 4,
+    totalRounds: 3,
+    roundRestSeconds: 60,
+    exerciseNames: [
+      "Squats",
+      "Push-ups",
+      "Lunges",
+      "Plank",
+    ],
+  },
+  {
     id: "30-30",
     name: "30/30",
     description: "Balanced 30s work / 30s rest × 10",
     workSeconds: 30,
     restSeconds: 30,
     rounds: 10,
-    exerciseNames: [
-      "Warm-up Jog",
-      "Lunges",
-      "Squats",
-      "Push-ups",
-      "Plank",
-      "Burpees",
-      "Jumping Jacks",
-      "Mountain Climbers",
-      "High Knees",
-      "Cool-down Stretch",
-    ],
-  },
-  {
-    id: "45-15",
-    name: "45/15",
-    description: "High volume 45s work / 15s rest × 8",
-    workSeconds: 45,
-    restSeconds: 15,
-    rounds: 8,
   },
 ];
 
@@ -87,8 +90,28 @@ export function createCustomWorkout(
   workSeconds: number,
   restSeconds: number,
   rounds: number,
-  exerciseNames?: string[]
+  exerciseNames?: string[],
+  isCircuit?: boolean,
+  exercises?: number,
+  totalRounds?: number,
+  roundRestSeconds?: number
 ): WorkoutConfig {
+  if (isCircuit && exercises && totalRounds) {
+    return {
+      id: "custom",
+      name: "Custom Circuit",
+      description: `${exercises} exercises × ${totalRounds} rounds`,
+      workSeconds,
+      restSeconds,
+      rounds: exercises * totalRounds,
+      exerciseNames: exerciseNames?.filter((n) => n.trim() !== ""),
+      isCircuit: true,
+      exercises,
+      totalRounds,
+      roundRestSeconds: roundRestSeconds || 60,
+    };
+  }
+  
   return {
     id: "custom",
     name: "Custom",
@@ -100,14 +123,39 @@ export function createCustomWorkout(
   };
 }
 
-export function getExerciseName(config: WorkoutConfig, round: number): string | null {
+export function getExerciseName(config: WorkoutConfig, exerciseIndex: number): string | null {
   if (!config.exerciseNames || config.exerciseNames.length === 0) {
     return null;
   }
-  if (round <= config.exerciseNames.length) {
-    return config.exerciseNames[round - 1] || null;
+  
+  if (config.isCircuit && config.exercises) {
+    // For circuit mode, cycle through exercise names
+    const idx = (exerciseIndex - 1) % config.exercises;
+    return config.exerciseNames[idx] || null;
+  }
+  
+  // For regular mode
+  if (exerciseIndex <= config.exerciseNames.length) {
+    return config.exerciseNames[exerciseIndex - 1] || null;
   }
   return null;
+}
+
+export function getCurrentRoundInCircuit(config: WorkoutConfig, intervalIndex: number): number {
+  if (!config.isCircuit || !config.exercises) return 1;
+  return Math.floor((intervalIndex - 1) / config.exercises) + 1;
+}
+
+export function getCurrentExerciseInRound(config: WorkoutConfig, intervalIndex: number): number {
+  if (!config.isCircuit || !config.exercises) return intervalIndex;
+  return ((intervalIndex - 1) % config.exercises) + 1;
+}
+
+export function isEndOfCircuitRound(config: WorkoutConfig, intervalIndex: number): boolean {
+  if (!config.isCircuit || !config.exercises || !config.totalRounds) return false;
+  const currentRound = getCurrentRoundInCircuit(config, intervalIndex);
+  const exerciseInRound = getCurrentExerciseInRound(config, intervalIndex);
+  return exerciseInRound === config.exercises && currentRound < config.totalRounds;
 }
 
 export function formatTime(totalSeconds: number): string {
@@ -117,6 +165,13 @@ export function formatTime(totalSeconds: number): string {
 }
 
 export function getTotalWorkoutTime(config: WorkoutConfig): number {
-  return (config.workSeconds + config.restSeconds) * config.rounds;
+  const intervalTime = (config.workSeconds + config.restSeconds) * config.rounds;
+  
+  if (config.isCircuit && config.totalRounds && config.roundRestSeconds) {
+    // Add round rest time (one less than total rounds, since no rest after last round)
+    const roundRestTime = config.roundRestSeconds * (config.totalRounds - 1);
+    return intervalTime + roundRestTime;
+  }
+  
+  return intervalTime;
 }
-

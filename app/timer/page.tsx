@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { WorkoutConfig, getExerciseName } from "@/lib/presets";
+import { WorkoutConfig, getExerciseName, getTotalWorkoutTime } from "@/lib/presets";
 import { addWorkoutToHistory } from "@/lib/history";
 import { useTimer, Phase } from "@/hooks/useTimer";
 import { useAudio } from "@/hooks/useAudio";
@@ -18,13 +18,13 @@ export default function TimerPage() {
   const audio = useAudio();
 
   const handlePhaseChange = useCallback(
-    (phase: Phase, round: number) => {
-      void round;
+    (phase: Phase, interval: number) => {
+      void interval;
       if (phase === "countdown") {
         audio.initAudio();
       } else if (phase === "work") {
         audio.playWorkStart();
-      } else if (phase === "rest") {
+      } else if (phase === "rest" || phase === "roundRest") {
         audio.playRestStart();
       } else if (phase === "complete") {
         audio.playComplete();
@@ -44,7 +44,7 @@ export default function TimerPage() {
 
   const handleComplete = useCallback(() => {
     if (config && !workoutSaved) {
-      const totalTime = (config.workSeconds + config.restSeconds) * config.rounds;
+      const totalTime = getTotalWorkoutTime(config);
       addWorkoutToHistory(
         config.name,
         config.workSeconds,
@@ -98,6 +98,8 @@ export default function TimerPage() {
         return 1 - timer.secondsRemaining / config.workSeconds;
       case "rest":
         return 1 - timer.secondsRemaining / config.restSeconds;
+      case "roundRest":
+        return 1 - timer.secondsRemaining / (config.roundRestSeconds || 60);
       case "complete":
         return 1;
       default:
@@ -111,6 +113,8 @@ export default function TimerPage() {
         return "rgb(var(--work))";
       case "rest":
         return "rgb(var(--rest))";
+      case "roundRest":
+        return "rgb(var(--accent))";
       default:
         return "rgb(var(--accent))";
     }
@@ -123,6 +127,8 @@ export default function TimerPage() {
       </div>
     );
   }
+
+  const exerciseName = getExerciseName(config, timer.currentInterval);
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-6">
@@ -140,27 +146,72 @@ export default function TimerPage() {
           <TimerDisplay
             seconds={timer.secondsRemaining}
             phase={timer.phase}
+            currentInterval={timer.currentInterval}
+            totalIntervals={timer.totalIntervals}
+            exerciseName={exerciseName}
+            isCircuit={timer.isCircuit}
             currentRound={timer.currentRound}
             totalRounds={timer.totalRounds}
-            exerciseName={getExerciseName(config, timer.currentRound)}
+            currentExercise={timer.currentExercise}
+            totalExercises={timer.totalExercises}
           />
         </ProgressRing>
       </div>
 
-      {timer.phase !== "idle" && timer.phase !== "complete" && config.rounds <= 20 && (
-        <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-xs">
-          {Array.from({ length: config.rounds }).map((_, i) => (
-            <div
-              key={i}
-              className={`w-3 h-3 rounded-full transition-all ${
-                i < timer.currentRound
-                  ? "bg-accent"
-                  : i === timer.currentRound - 1 && timer.phase === "work"
-                  ? "bg-work"
-                  : "bg-muted"
-              }`}
-            />
-          ))}
+      {/* Progress dots */}
+      {timer.phase !== "idle" && timer.phase !== "complete" && (
+        <div className="mb-8">
+          {config.isCircuit && config.exercises && config.totalRounds ? (
+            // Circuit mode: show exercise dots for current round
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex gap-2">
+                {Array.from({ length: config.exercises }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-3 h-3 rounded-full transition-all ${
+                      i < timer.currentExercise
+                        ? "bg-accent"
+                        : i === timer.currentExercise - 1 && timer.phase === "work"
+                        ? "bg-work"
+                        : "bg-muted"
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                {Array.from({ length: config.totalRounds }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      i < timer.currentRound
+                        ? "bg-accent"
+                        : i === timer.currentRound - 1
+                        ? "bg-accent/50"
+                        : "bg-muted"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            // Simple mode: show all rounds as dots
+            config.rounds <= 20 && (
+              <div className="flex flex-wrap justify-center gap-2 max-w-xs">
+                {Array.from({ length: config.rounds }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-3 h-3 rounded-full transition-all ${
+                      i < timer.currentInterval
+                        ? "bg-accent"
+                        : i === timer.currentInterval - 1 && timer.phase === "work"
+                        ? "bg-work"
+                        : "bg-muted"
+                    }`}
+                  />
+                ))}
+              </div>
+            )
+          )}
         </div>
       )}
 
@@ -176,11 +227,13 @@ export default function TimerPage() {
         <div className="mt-8 text-center">
           <p className="text-2xl font-bold text-accent mb-2">Great workout!</p>
           <p className="text-muted-foreground">
-            {config.rounds} rounds completed
+            {config.isCircuit 
+              ? `${config.totalRounds} rounds × ${config.exercises} exercises completed`
+              : `${config.rounds} rounds completed`
+            }
           </p>
         </div>
       )}
     </main>
   );
 }
-

@@ -20,9 +20,18 @@ export default function HomePage() {
 
   const [selectedPreset, setSelectedPreset] = useState<WorkoutConfig | null>(null);
   const [showCustom, setShowCustom] = useState(false);
+  
+  // Simple mode settings
   const [customWork, setCustomWork] = useState(30);
   const [customRest, setCustomRest] = useState(15);
   const [customRounds, setCustomRounds] = useState(8);
+  
+  // Circuit mode settings
+  const [isCircuitMode, setIsCircuitMode] = useState(false);
+  const [circuitExercises, setCircuitExercises] = useState(4);
+  const [circuitRounds, setCircuitRounds] = useState(3);
+  const [circuitRoundRest, setCircuitRoundRest] = useState(60);
+  
   const [customExerciseNames, setCustomExerciseNames] = useState<string[]>([]);
   const [showExerciseNames, setShowExerciseNames] = useState(false);
   const [history, setHistory] = useState<WorkoutRecord[]>([]);
@@ -52,16 +61,18 @@ export default function HomePage() {
     fetchSavedWorkouts();
   }, [fetchSavedWorkouts]);
 
+  // Adjust exercise names array when counts change
+  const exerciseCount = isCircuitMode ? circuitExercises : customRounds;
   useEffect(() => {
-    if (customExerciseNames.length < customRounds) {
+    if (customExerciseNames.length < exerciseCount) {
       setCustomExerciseNames((prev) => [
         ...prev,
-        ...Array(customRounds - prev.length).fill(""),
+        ...Array(exerciseCount - prev.length).fill(""),
       ]);
-    } else if (customExerciseNames.length > customRounds) {
-      setCustomExerciseNames((prev) => prev.slice(0, customRounds));
+    } else if (customExerciseNames.length > exerciseCount) {
+      setCustomExerciseNames((prev) => prev.slice(0, exerciseCount));
     }
-  }, [customRounds, customExerciseNames.length]);
+  }, [exerciseCount, customExerciseNames.length]);
 
   const handleSelectPreset = (preset: WorkoutConfig) => {
     setSelectedPreset(preset);
@@ -69,43 +80,54 @@ export default function HomePage() {
     setEditingWorkoutId(null);
   };
 
-  const updateCustomWorkout = (
-    work = customWork,
-    rest = customRest,
-    rounds = customRounds,
-    names = customExerciseNames
-  ) => {
-    setSelectedPreset(createCustomWorkout(work, rest, rounds, names));
-  };
+  const buildCustomWorkout = useCallback(() => {
+    if (isCircuitMode) {
+      return createCustomWorkout(
+        customWork,
+        customRest,
+        circuitExercises * circuitRounds, // Total intervals
+        customExerciseNames,
+        true,
+        circuitExercises,
+        circuitRounds,
+        circuitRoundRest
+      );
+    }
+    return createCustomWorkout(customWork, customRest, customRounds, customExerciseNames);
+  }, [customWork, customRest, customRounds, customExerciseNames, isCircuitMode, circuitExercises, circuitRounds, circuitRoundRest]);
+
 
   const handleCustomSelect = () => {
     setShowCustom(true);
-    updateCustomWorkout();
+    setSelectedPreset(buildCustomWorkout());
   };
 
   // Load a workout config into the custom form
   const loadIntoCustomForm = (config: WorkoutConfig, workoutId?: string) => {
     setCustomWork(config.workSeconds);
     setCustomRest(config.restSeconds);
-    setCustomRounds(config.rounds);
-    setCustomExerciseNames(config.exerciseNames || Array(config.rounds).fill(""));
+    
+    if (config.isCircuit && config.exercises && config.totalRounds) {
+      setIsCircuitMode(true);
+      setCircuitExercises(config.exercises);
+      setCircuitRounds(config.totalRounds);
+      setCircuitRoundRest(config.roundRestSeconds || 60);
+      setCustomExerciseNames(config.exerciseNames || Array(config.exercises).fill(""));
+    } else {
+      setIsCircuitMode(false);
+      setCustomRounds(config.rounds);
+      setCustomExerciseNames(config.exerciseNames || Array(config.rounds).fill(""));
+    }
+    
     setShowCustom(true);
     setEditingWorkoutId(workoutId || null);
 
-    // Show exercise names if there are any
     if (config.exerciseNames && config.exerciseNames.some(n => n)) {
       setShowExerciseNames(true);
     }
 
-    // Update selected preset
-    setSelectedPreset(createCustomWorkout(
-      config.workSeconds,
-      config.restSeconds,
-      config.rounds,
-      config.exerciseNames || []
-    ));
+    setSelectedPreset(config);
 
-    // Scroll to custom section
     setTimeout(() => {
       customSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 100);
@@ -124,10 +146,14 @@ export default function HomePage() {
     const updated = [...customExerciseNames];
     updated[index] = name;
     setCustomExerciseNames(updated);
-    if (showCustom) {
-      updateCustomWorkout(customWork, customRest, customRounds, updated);
-    }
   };
+
+  // Update selected preset when any custom value changes
+  useEffect(() => {
+    if (showCustom) {
+      setSelectedPreset(buildCustomWorkout());
+    }
+  }, [showCustom, customWork, customRest, customRounds, customExerciseNames, isCircuitMode, circuitExercises, circuitRounds, circuitRoundRest, buildCustomWorkout]);
 
   const handleStartWorkout = () => {
     if (!selectedPreset) return;
@@ -156,7 +182,7 @@ export default function HomePage() {
     }
   };
 
-  const customPreview = createCustomWorkout(customWork, customRest, customRounds, customExerciseNames);
+  const customPreview = buildCustomWorkout();
 
   return (
     <main className="min-h-screen p-6 pb-40 max-w-2xl mx-auto">
@@ -192,21 +218,11 @@ export default function HomePage() {
           >
             {theme === "dark" ? (
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
             ) : (
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
               </svg>
             )}
           </button>
@@ -262,9 +278,7 @@ export default function HomePage() {
       <section className="mb-10" ref={customSectionRef}>
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
           Custom Workout
-          {editingWorkoutId && (
-            <span className="ml-2 text-accent">(Editing)</span>
-          )}
+          {editingWorkoutId && <span className="ml-2 text-accent">(Editing)</span>}
         </h2>
         <div
           onClick={handleCustomSelect}
@@ -274,7 +288,32 @@ export default function HomePage() {
               : "border-border bg-card hover:border-accent/50 hover:bg-accent/5"
           }`}
         >
-          <div className="grid grid-cols-3 gap-4 mb-5">
+          {/* Mode Toggle */}
+          <div className="flex gap-2 mb-5" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setIsCircuitMode(false)}
+              className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-all ${
+                !isCircuitMode
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Simple
+            </button>
+            <button
+              onClick={() => setIsCircuitMode(true)}
+              className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-all ${
+                isCircuitMode
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Circuit
+            </button>
+          </div>
+
+          {/* Work/Rest inputs (always shown) */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-2">Work (sec)</label>
               <input
@@ -283,13 +322,7 @@ export default function HomePage() {
                 max={300}
                 value={customWork}
                 onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setCustomWork(val);
-                  if (showCustom) {
-                    updateCustomWorkout(val, customRest, customRounds, customExerciseNames);
-                  }
-                }}
+                onChange={(e) => setCustomWork(Number(e.target.value))}
                 onFocus={handleCustomSelect}
                 className="w-full px-3 py-2.5 rounded-xl bg-background border-2 border-border text-foreground font-mono text-center focus:outline-none focus:border-accent transition-colors"
               />
@@ -302,18 +335,16 @@ export default function HomePage() {
                 max={300}
                 value={customRest}
                 onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setCustomRest(val);
-                  if (showCustom) {
-                    updateCustomWorkout(customWork, val, customRounds, customExerciseNames);
-                  }
-                }}
+                onChange={(e) => setCustomRest(Number(e.target.value))}
                 onFocus={handleCustomSelect}
                 className="w-full px-3 py-2.5 rounded-xl bg-background border-2 border-border text-foreground font-mono text-center focus:outline-none focus:border-accent transition-colors"
               />
             </div>
-            <div>
+          </div>
+
+          {/* Simple mode: just rounds */}
+          {!isCircuitMode && (
+            <div className="mb-4">
               <label className="block text-xs font-medium text-muted-foreground mb-2">Rounds</label>
               <input
                 type="number"
@@ -321,19 +352,59 @@ export default function HomePage() {
                 max={99}
                 value={customRounds}
                 onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setCustomRounds(val);
-                  if (showCustom) {
-                    updateCustomWorkout(customWork, customRest, val, customExerciseNames);
-                  }
-                }}
+                onChange={(e) => setCustomRounds(Number(e.target.value))}
                 onFocus={handleCustomSelect}
                 className="w-full px-3 py-2.5 rounded-xl bg-background border-2 border-border text-foreground font-mono text-center focus:outline-none focus:border-accent transition-colors"
               />
             </div>
-          </div>
+          )}
 
+          {/* Circuit mode: exercises, rounds, round rest */}
+          {isCircuitMode && (
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-2">Exercises</label>
+                <input
+                  type="number"
+                  min={2}
+                  max={20}
+                  value={circuitExercises}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setCircuitExercises(Number(e.target.value))}
+                  onFocus={handleCustomSelect}
+                  className="w-full px-3 py-2.5 rounded-xl bg-background border-2 border-border text-foreground font-mono text-center focus:outline-none focus:border-accent transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-2">Rounds</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={circuitRounds}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setCircuitRounds(Number(e.target.value))}
+                  onFocus={handleCustomSelect}
+                  className="w-full px-3 py-2.5 rounded-xl bg-background border-2 border-border text-foreground font-mono text-center focus:outline-none focus:border-accent transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-2">Round Rest</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={300}
+                  value={circuitRoundRest}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setCircuitRoundRest(Number(e.target.value))}
+                  onFocus={handleCustomSelect}
+                  className="w-full px-3 py-2.5 rounded-xl bg-background border-2 border-border text-foreground font-mono text-center focus:outline-none focus:border-accent transition-colors"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Exercise names */}
           <button
             type="button"
             onClick={(e) => {
@@ -350,19 +421,19 @@ export default function HomePage() {
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            Name each round (optional)
+            Name {isCircuitMode ? "exercises" : "each round"} (optional)
           </button>
 
           {showExerciseNames && (
             <div className="space-y-2 mb-5 max-h-48 overflow-y-auto pr-2" onClick={(e) => e.stopPropagation()}>
-              {Array.from({ length: customRounds }).map((_, i) => (
+              {Array.from({ length: exerciseCount }).map((_, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground w-6 text-right font-mono">{i + 1}.</span>
                   <input
                     type="text"
                     value={customExerciseNames[i] || ""}
                     onChange={(e) => handleExerciseNameChange(i, e.target.value)}
-                    placeholder={`Round ${i + 1} exercise`}
+                    placeholder={isCircuitMode ? `Exercise ${i + 1}` : `Round ${i + 1} exercise`}
                     className="flex-1 px-3 py-2 rounded-xl bg-background border-2 border-border text-foreground text-sm focus:outline-none focus:border-accent placeholder:text-muted-foreground/50 transition-colors"
                   />
                 </div>
@@ -370,8 +441,15 @@ export default function HomePage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-2 border-t border-border/50">
-            <span className="text-sm text-muted-foreground">Total time</span>
+          {/* Summary */}
+          <div className="flex items-center justify-between pt-3 border-t border-border/50">
+            <div className="text-sm text-muted-foreground">
+              {isCircuitMode ? (
+                <span>{circuitExercises} exercises × {circuitRounds} rounds</span>
+              ) : (
+                <span>{customRounds} rounds</span>
+              )}
+            </div>
             <span className="font-mono text-foreground font-medium">
               {formatTime(getTotalWorkoutTime(customPreview))}
             </span>
@@ -384,12 +462,15 @@ export default function HomePage() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setEditingWorkoutId(null);
+                    setIsCircuitMode(false);
                     setCustomWork(30);
                     setCustomRest(15);
                     setCustomRounds(8);
+                    setCircuitExercises(4);
+                    setCircuitRounds(3);
+                    setCircuitRoundRest(60);
                     setCustomExerciseNames([]);
                     setShowExerciseNames(false);
-                    updateCustomWorkout(30, 15, 8, []);
                   }}
                   className="flex-1 py-3 rounded-xl border-2 border-border text-muted-foreground font-semibold hover:bg-muted transition-colors"
                 >
