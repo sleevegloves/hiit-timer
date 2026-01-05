@@ -15,23 +15,23 @@ import { SaveWorkoutModal } from "@/components/SaveWorkoutModal";
 export default function HomePage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, displayName, initials } = useAuth();
   const customSectionRef = useRef<HTMLDivElement>(null);
 
   const [selectedPreset, setSelectedPreset] = useState<WorkoutConfig | null>(null);
   const [showCustom, setShowCustom] = useState(false);
-  
+
   // Simple mode settings
   const [customWork, setCustomWork] = useState(30);
   const [customRest, setCustomRest] = useState(15);
   const [customRounds, setCustomRounds] = useState(8);
-  
+
   // Circuit mode settings
   const [isCircuitMode, setIsCircuitMode] = useState(false);
   const [circuitExercises, setCircuitExercises] = useState(4);
   const [circuitRounds, setCircuitRounds] = useState(3);
   const [circuitRoundRest, setCircuitRoundRest] = useState(60);
-  
+
   const [customExerciseNames, setCustomExerciseNames] = useState<string[]>([]);
   const [showExerciseNames, setShowExerciseNames] = useState(false);
   const [history, setHistory] = useState<WorkoutRecord[]>([]);
@@ -106,7 +106,7 @@ export default function HomePage() {
   const loadIntoCustomForm = (config: WorkoutConfig, workoutId?: string) => {
     setCustomWork(config.workSeconds);
     setCustomRest(config.restSeconds);
-    
+
     if (config.isCircuit && config.exercises && config.totalRounds) {
       setIsCircuitMode(true);
       setCircuitExercises(config.exercises);
@@ -118,7 +118,7 @@ export default function HomePage() {
       setCustomRounds(config.rounds);
       setCustomExerciseNames(config.exerciseNames || Array(config.rounds).fill(""));
     }
-    
+
     setShowCustom(true);
     setEditingWorkoutId(workoutId || null);
 
@@ -190,18 +190,26 @@ export default function HomePage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground tracking-tight">HIIT Timer</h1>
           <p className="text-muted-foreground mt-1">
-            {user ? `Welcome, ${user.email?.split("@")[0]}` : "Choose a workout to begin"}
+            {user ? `Welcome, ${displayName}` : "Choose a workout to begin"}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {!authLoading && (
             user ? (
-              <button
-                onClick={() => signOut()}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl bg-card border border-border hover:bg-muted transition-colors"
-              >
-                Sign Out
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center text-accent-foreground font-semibold text-sm">
+                  {initials}
+                </div>
+                <button
+                  onClick={() => signOut()}
+                  className="px-4 py-2.5 text-sm font-medium rounded-xl bg-card border border-border hover:bg-muted transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Sign Out
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}

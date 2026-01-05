@@ -9,7 +9,9 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isConfigured: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  displayName: string | null;
+  initials: string | null;
+  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -19,6 +21,8 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   isConfigured: false,
+  displayName: null,
+  initials: null,
   signUp: async () => ({ error: null }),
   signIn: async () => ({ error: null }),
   signOut: async () => {},
@@ -34,6 +38,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return false;
     return isSupabaseConfigured();
   }, []);
+
+  // Compute display name from user metadata
+  const displayName = useMemo(() => {
+    if (!user) return null;
+    const metadata = user.user_metadata;
+    if (metadata?.first_name) {
+      return metadata.first_name;
+    }
+    // Fallback to email prefix
+    return user.email?.split("@")[0] || null;
+  }, [user]);
+
+  // Compute initials from user metadata
+  const initials = useMemo(() => {
+    if (!user) return null;
+    const metadata = user.user_metadata;
+    if (metadata?.first_name && metadata?.last_name) {
+      return `${metadata.first_name[0]}${metadata.last_name[0]}`.toUpperCase();
+    }
+    if (metadata?.first_name) {
+      return metadata.first_name[0].toUpperCase();
+    }
+    // Fallback to email first letter
+    return user.email?.[0].toUpperCase() || null;
+  }, [user]);
 
   useEffect(() => {
     setMounted(true);
@@ -77,13 +106,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [mounted, isConfigured]);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
     const supabase = createClient();
     if (!supabase) return { error: new Error("Supabase not configured") };
 
     const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          first_name: firstName || "",
+          last_name: lastName || "",
+        },
+      },
     });
     return { error: error as Error | null };
   };
@@ -108,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, isConfigured, signUp, signIn, signOut }}
+      value={{ user, session, loading, isConfigured, displayName, initials, signUp, signIn, signOut }}
     >
       {children}
     </AuthContext.Provider>
@@ -118,4 +153,3 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
-

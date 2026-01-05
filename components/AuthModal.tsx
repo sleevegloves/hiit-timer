@@ -13,6 +13,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
@@ -27,13 +29,15 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
     try {
       if (mode === "signup") {
-        const { error } = await signUp(email, password);
+        const { error } = await signUp(email, password, firstName, lastName);
         if (error) {
           setError(error.message);
         } else {
           setSuccess("Check your email for a confirmation link!");
           setEmail("");
           setPassword("");
+          setFirstName("");
+          setLastName("");
         }
       } else {
         const { error } = await signIn(email, password);
@@ -57,7 +61,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         onClick={onClose}
       />
 
-      <div className="relative bg-background border border-muted rounded-2xl p-6 w-full max-w-md shadow-xl">
+      <div className="relative bg-background border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 rounded-lg hover:bg-muted transition-colors"
@@ -77,6 +81,37 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === "signup" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl bg-card border-2 border-border text-foreground focus:outline-none focus:border-accent transition-colors"
+                  placeholder="John"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl bg-card border-2 border-border text-foreground focus:outline-none focus:border-accent transition-colors"
+                  placeholder="Doe"
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
               Email
@@ -86,7 +121,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2.5 rounded-xl bg-muted border border-muted text-foreground focus:outline-none focus:border-accent"
+              className="w-full px-4 py-2.5 rounded-xl bg-card border-2 border-border text-foreground focus:outline-none focus:border-accent transition-colors"
               placeholder="you@example.com"
             />
           </div>
@@ -101,7 +136,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-2.5 rounded-xl bg-muted border border-muted text-foreground focus:outline-none focus:border-accent"
+              className="w-full px-4 py-2.5 rounded-xl bg-card border-2 border-border text-foreground focus:outline-none focus:border-accent transition-colors"
               placeholder="••••••••"
             />
           </div>
@@ -146,4 +181,3 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     </div>
   );
 }
-
