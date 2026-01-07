@@ -18,7 +18,7 @@ import { ProfileSetupModal } from "@/components/ProfileSetupModal";
 export default function HomePage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const { user, loading: authLoading, signOut, displayName, initials } = useAuth();
+  const { user, loading: authLoading, signOut, displayName } = useAuth();
   const customSectionRef = useRef<HTMLDivElement>(null);
 
   const [selectedPreset, setSelectedPreset] = useState<WorkoutConfig | null>(null);

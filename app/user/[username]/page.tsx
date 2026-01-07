@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { getProfileByUsername, followUser, unfollowUser, isFollowing, getFollowerCount, getFollowingCount } from "@/lib/profiles";
-import { getPublicWorkouts, savedWorkoutToConfig } from "@/lib/savedWorkouts";
+import { savedWorkoutToConfig } from "@/lib/savedWorkouts";
 import { Profile, SavedWorkout } from "@/lib/database.types";
 import { useAuth } from "@/components/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
@@ -155,10 +156,13 @@ export default function UserProfilePage() {
         <div className="flex items-start gap-5">
           {/* Avatar */}
           {profile.avatar_url ? (
-            <img
+            <Image
               src={profile.avatar_url}
               alt={displayName}
+              width={80}
+              height={80}
               className="w-20 h-20 rounded-full object-cover"
+              unoptimized
             />
           ) : (
             <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-accent-foreground text-2xl font-bold">

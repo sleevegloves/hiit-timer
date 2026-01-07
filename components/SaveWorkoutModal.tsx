@@ -55,6 +55,7 @@ export function SaveWorkoutModal({
       setDescription(initialDescription ?? "");
       setError(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]); // Only re-run when modal opens/closes
 
   if (!isOpen || !user) return null;
