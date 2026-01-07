@@ -6,12 +6,14 @@ import { WorkoutConfig, getExerciseName, getNextExerciseName, getTotalWorkoutTim
 import { addWorkoutToHistory } from "@/lib/history";
 import { useTimer, Phase } from "@/hooks/useTimer";
 import { useAudio } from "@/hooks/useAudio";
+import { useAuth } from "@/components/AuthProvider";
 import { ProgressRing } from "@/components/ProgressRing";
 import { TimerDisplay } from "@/components/TimerDisplay";
 import { Controls } from "@/components/Controls";
 
 export default function TimerPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [config, setConfig] = useState<WorkoutConfig | null>(null);
   const workoutSavedRef = useRef(false);
 
@@ -51,10 +53,11 @@ export default function TimerPage() {
         config.workSeconds,
         config.restSeconds,
         config.rounds,
-        totalTime
+        totalTime,
+        user?.id
       );
     }
-  }, [config]);
+  }, [config, user?.id]);
 
   const timer = useTimer(config, {
     onPhaseChange: handlePhaseChange,

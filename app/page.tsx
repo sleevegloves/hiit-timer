@@ -2,15 +2,18 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PRESETS, WorkoutConfig, createCustomWorkout, formatTime, getTotalWorkoutTime } from "@/lib/presets";
-import { getHistory, WorkoutRecord, formatDuration, formatRelativeTime, historyRecordToConfig } from "@/lib/history";
-import { getSavedWorkouts, deleteWorkout, savedWorkoutToConfig } from "@/lib/savedWorkouts";
-import { SavedWorkout } from "@/lib/database.types";
+import { getHistory, syncLocalHistoryToDb, WorkoutRecord, formatDuration, formatRelativeTime, historyRecordToConfig } from "@/lib/history";
+import { getSavedWorkouts, deleteWorkout, savedWorkoutToConfig, getSavedCommunityWorkouts, SavedCommunityWorkout, unsaveWorkoutFromCollection } from "@/lib/savedWorkouts";
+import { getProfile } from "@/lib/profiles";
+import { SavedWorkout, Profile } from "@/lib/database.types";
 import { PresetCard } from "@/components/PresetCard";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/components/AuthProvider";
 import { AuthModal } from "@/components/AuthModal";
 import { SaveWorkoutModal } from "@/components/SaveWorkoutModal";
+import { ProfileSetupModal } from "@/components/ProfileSetupModal";
 
 export default function HomePage() {
   const router = useRouter();
@@ -37,24 +40,59 @@ export default function HomePage() {
   const [history, setHistory] = useState<WorkoutRecord[]>([]);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [editingWorkoutName, setEditingWorkoutName] = useState<string | null>(null);
+  const [editingWorkoutIsPublic, setEditingWorkoutIsPublic] = useState(false);
+  const [editingWorkoutTags, setEditingWorkoutTags] = useState<string[]>([]);
+  const [editingWorkoutDescription, setEditingWorkoutDescription] = useState("");
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [savedWorkouts, setSavedWorkouts] = useState<SavedWorkout[]>([]);
+  const [communityWorkouts, setCommunityWorkouts] = useState<SavedCommunityWorkout[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  // Fetch history (from DB if logged in, localStorage otherwise)
+  const fetchHistory = useCallback(async () => {
+    const records = await getHistory(user?.id);
+    setHistory(records);
+  }, [user?.id]);
 
   useEffect(() => {
-    setHistory(getHistory());
-  }, []);
+    fetchHistory();
+  }, [fetchHistory]);
+
+  // Sync local history to DB when user logs in
+  useEffect(() => {
+    if (user?.id) {
+      syncLocalHistoryToDb(user.id).then(() => {
+        fetchHistory(); // Refresh after sync
+      });
+    }
+  }, [user?.id, fetchHistory]);
+
+  // Fetch user profile
+  useEffect(() => {
+    if (user?.id) {
+      getProfile(user.id).then(setProfile);
+    } else {
+      setProfile(null);
+    }
+  }, [user?.id]);
 
   const fetchSavedWorkouts = useCallback(async () => {
     if (!user) {
       setSavedWorkouts([]);
+      setCommunityWorkouts([]);
       return;
     }
     setLoadingSaved(true);
-    const workouts = await getSavedWorkouts(user.id);
+    const [workouts, community] = await Promise.all([
+      getSavedWorkouts(user.id),
+      getSavedCommunityWorkouts(user.id),
+    ]);
     setSavedWorkouts(workouts);
+    setCommunityWorkouts(community);
     setLoadingSaved(false);
   }, [user]);
 
@@ -141,6 +179,9 @@ export default function HomePage() {
   const handleEditSavedWorkout = (saved: SavedWorkout) => {
     const config = savedWorkoutToConfig(saved);
     setEditingWorkoutName(saved.name);
+    setEditingWorkoutIsPublic(saved.is_public);
+    setEditingWorkoutTags(saved.tags ?? []);
+    setEditingWorkoutDescription(saved.description ?? "");
     loadIntoCustomForm(config, saved.id);
   };
 
@@ -184,34 +225,38 @@ export default function HomePage() {
     }
   };
 
+  const handleRemoveCommunityWorkout = async (workoutId: string) => {
+    if (!user) return;
+    await unsaveWorkoutFromCollection(user.id, workoutId);
+    setCommunityWorkouts((prev) => prev.filter((w) => w.id !== workoutId));
+  };
+
   const customPreview = buildCustomWorkout();
 
   return (
     <main className="min-h-screen p-6 pb-40 max-w-2xl mx-auto">
-      <header className="flex items-center justify-between mb-10">
+      <header className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground tracking-tight">HIIT Timer</h1>
           <p className="text-muted-foreground mt-1">
-            {user ? `Welcome, ${displayName}` : "Choose a workout to begin"}
+            {user
+              ? `Welcome, ${profile?.display_name || profile?.username || displayName}`
+              : "Choose a workout to begin"}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {!authLoading && (
             user ? (
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center text-accent-foreground font-semibold text-sm">
-                  {initials}
-                </div>
+              <>
+                {/* Profile button */}
                 <button
-                  onClick={() => signOut()}
-                  className="px-4 py-2.5 text-sm font-medium rounded-xl bg-card border border-border hover:bg-muted transition-colors flex items-center gap-2"
+                  onClick={() => setShowProfileModal(true)}
+                  className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-accent-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+                  title={profile?.username ? `@${profile.username}` : "Set up profile"}
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  Sign Out
+                  {(profile?.display_name || profile?.username || displayName || "?").slice(0, 2).toUpperCase()}
                 </button>
-              </div>
+              </>
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}
@@ -223,7 +268,7 @@ export default function HomePage() {
           )}
           <button
             onClick={toggleTheme}
-            className="p-3 rounded-xl bg-card border border-border hover:bg-muted transition-colors"
+            className="p-2.5 rounded-xl bg-card border border-border hover:bg-muted transition-colors"
             aria-label="Toggle theme"
           >
             {theme === "dark" ? (
@@ -238,6 +283,41 @@ export default function HomePage() {
           </button>
         </div>
       </header>
+
+      {/* Navigation */}
+      <nav className="flex gap-2 mb-8">
+        <Link
+          href="/discover"
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-card border-2 border-border hover:border-accent/50 hover:bg-accent/5 transition-all"
+        >
+          <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span className="font-medium text-foreground">Discover</span>
+        </Link>
+        {user && profile?.username && (
+          <Link
+            href={`/user/${profile.username}`}
+            className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-card border-2 border-border hover:border-accent/50 hover:bg-accent/5 transition-all"
+          >
+            <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span className="font-medium text-foreground">My Profile</span>
+          </Link>
+        )}
+        {user && (
+          <button
+            onClick={() => signOut()}
+            className="py-3 px-4 rounded-xl bg-card border-2 border-border hover:border-red-500/50 hover:bg-red-500/5 transition-all"
+            title="Sign Out"
+          >
+            <svg className="w-5 h-5 text-muted-foreground hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+        )}
+      </nav>
 
       {user && savedWorkouts.length > 0 && (
         <section className="mb-10">
@@ -256,6 +336,89 @@ export default function HomePage() {
                   onDelete={() => handleDeleteSavedWorkout(saved.id)}
                   selected={!showCustom && selectedPreset?.id === config.id}
                 />
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {user && communityWorkouts.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
+            Saved from Community
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {communityWorkouts.map((workout) => {
+              const config = savedWorkoutToConfig(workout);
+              const isSelected = !showCustom && selectedPreset?.id === config.id;
+              return (
+                <div
+                  key={workout.id}
+                  className={`relative p-5 rounded-2xl border-2 transition-all ${
+                    isSelected
+                      ? "border-accent bg-accent/20 ring-4 ring-accent/40"
+                      : "border-border bg-card hover:border-accent/50 hover:bg-accent/5"
+                  }`}
+                >
+                  {/* Owner tag */}
+                  <Link
+                    href={workout.owner_username ? `/user/${workout.owner_username}` : "#"}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/10 text-accent text-xs font-medium mb-3 hover:bg-accent/20 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    @{workout.owner_username || "unknown"}
+                  </Link>
+
+                  {/* Workout content - clickable to select */}
+                  <button
+                    onClick={() => handleSelectPreset(config)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className={`text-lg font-semibold ${isSelected ? "text-accent" : "text-foreground"}`}>
+                        {workout.name}
+                      </h3>
+                      <span className={`text-xs font-mono px-2.5 py-1 rounded-full ${
+                        isSelected ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {formatTime(getTotalWorkoutTime(config))}
+                      </span>
+                    </div>
+
+                    {workout.description && (
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{workout.description}</p>
+                    )}
+
+                    <div className="flex gap-4 text-xs font-mono">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-work" />
+                        <span className="text-foreground">{workout.work_seconds}s</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rest" />
+                        <span className="text-foreground">{workout.rest_seconds}s</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">×</span>
+                        <span className="text-foreground">{workout.rounds}</span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Remove button */}
+                  <button
+                    onClick={() => handleRemoveCommunityWorkout(workout.id)}
+                    className="absolute top-4 right-4 p-2 rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                    title="Remove from collection"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -473,6 +636,9 @@ export default function HomePage() {
                     e.stopPropagation();
                     setEditingWorkoutId(null);
                     setEditingWorkoutName(null);
+                    setEditingWorkoutIsPublic(false);
+                    setEditingWorkoutTags([]);
+                    setEditingWorkoutDescription("");
                     setIsCircuitMode(false);
                     setCustomWork(30);
                     setCustomRest(15);
@@ -592,11 +758,25 @@ export default function HomePage() {
             setShowCustom(false);
             setEditingWorkoutId(null);
             setEditingWorkoutName(null);
+            setEditingWorkoutIsPublic(false);
+            setEditingWorkoutTags([]);
+            setEditingWorkoutDescription("");
           }}
           editingId={editingWorkoutId}
           editingName={editingWorkoutName}
+          initialIsPublic={editingWorkoutIsPublic}
+          initialTags={editingWorkoutTags}
+          initialDescription={editingWorkoutDescription}
         />
       )}
+
+      <ProfileSetupModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onProfileUpdated={(updatedProfile) => {
+          setProfile(updatedProfile);
+        }}
+      />
     </main>
   );
 }

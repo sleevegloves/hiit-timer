@@ -1,3 +1,6 @@
+import { createClient } from "@/lib/supabase";
+import { WorkoutHistory } from "@/lib/database.types";
+
 export interface WorkoutRecord {
   id: string;
   presetName: string;
@@ -10,7 +13,8 @@ export interface WorkoutRecord {
 
 const STORAGE_KEY = "hiit-workout-history";
 
-export function getHistory(): WorkoutRecord[] {
+// Local storage functions (fallback/cache)
+export function getLocalHistory(): WorkoutRecord[] {
   if (typeof window === "undefined") return [];
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -20,13 +24,45 @@ export function getHistory(): WorkoutRecord[] {
   }
 }
 
-export function addWorkoutToHistory(
+function saveLocalHistory(history: WorkoutRecord[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, 50)));
+}
+
+// Database functions
+export async function getHistory(userId?: string): Promise<WorkoutRecord[]> {
+  if (!userId) {
+    return getLocalHistory();
+  }
+
+  const supabase = createClient();
+  if (!supabase) {
+    return getLocalHistory();
+  }
+
+  const { data, error } = await supabase
+    .from("workout_history")
+    .select("*")
+    .eq("user_id", userId)
+    .order("completed_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("Error fetching history:", error);
+    return getLocalHistory();
+  }
+
+  // Convert DB format to local format
+  return (data || []).map(dbRecordToLocal);
+}
+
+export async function addWorkoutToHistory(
   presetName: string,
   workSeconds: number,
   restSeconds: number,
   rounds: number,
-  totalTime: number
-): WorkoutRecord {
+  totalTime: number,
+  userId?: string
+): Promise<WorkoutRecord> {
   const record: WorkoutRecord = {
     id: crypto.randomUUID(),
     presetName,
@@ -37,11 +73,71 @@ export function addWorkoutToHistory(
     completedAt: new Date().toISOString(),
   };
 
-  const history = getHistory();
-  history.unshift(record);
-  const trimmed = history.slice(0, 50);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+  // Always save to local storage as cache
+  const localHistory = getLocalHistory();
+  localHistory.unshift(record);
+  saveLocalHistory(localHistory);
+
+  // If logged in, also save to database
+  if (userId) {
+    const supabase = createClient();
+    if (supabase) {
+      const { error } = await supabase.from("workout_history").insert({
+        id: record.id,
+        user_id: userId,
+        workout_name: presetName,
+        work_seconds: workSeconds,
+        rest_seconds: restSeconds,
+        rounds,
+        total_time: totalTime,
+        completed_at: record.completedAt,
+      });
+
+      if (error) {
+        console.error("Error saving history to DB:", error);
+      }
+    }
+  }
+
   return record;
+}
+
+export async function syncLocalHistoryToDb(userId: string): Promise<void> {
+  const supabase = createClient();
+  if (!supabase) return;
+
+  const localHistory = getLocalHistory();
+  if (localHistory.length === 0) return;
+
+  // Get existing DB history to avoid duplicates
+  const { data: existing } = await supabase
+    .from("workout_history")
+    .select("id")
+    .eq("user_id", userId);
+
+  const existingIds = new Set((existing || []).map((r) => r.id));
+
+  // Filter out already synced records
+  const toSync = localHistory.filter((r) => !existingIds.has(r.id));
+
+  if (toSync.length === 0) return;
+
+  const { error } = await supabase.from("workout_history").insert(
+    toSync.map((r) => ({
+      id: r.id,
+      user_id: userId,
+      workout_name: r.presetName,
+      work_seconds: r.workSeconds,
+      rest_seconds: r.restSeconds,
+      rounds: r.rounds,
+      total_time: r.totalTime,
+      completed_at: r.completedAt,
+    }))
+  );
+
+  if (error) {
+    console.error("Error syncing history:", error);
+  }
 }
 
 export function clearHistory(): void {
@@ -82,3 +178,15 @@ export function historyRecordToConfig(record: WorkoutRecord) {
   };
 }
 
+// Helper to convert DB record to local format
+function dbRecordToLocal(db: WorkoutHistory): WorkoutRecord {
+  return {
+    id: db.id,
+    presetName: db.workout_name,
+    workSeconds: db.work_seconds,
+    restSeconds: db.rest_seconds,
+    rounds: db.rounds,
+    totalTime: db.total_time,
+    completedAt: db.completed_at,
+  };
+}
