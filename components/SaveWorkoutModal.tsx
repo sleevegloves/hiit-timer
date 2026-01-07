@@ -9,11 +9,12 @@ interface SaveWorkoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   workout: WorkoutConfig;
-  onSaved: () => void;
+  onSaved: (savedWorkoutId: string, savedName: string) => void;
   editingId?: string | null;
+  editingName?: string | null;
 }
 
-export function SaveWorkoutModal({ isOpen, onClose, workout, onSaved, editingId }: SaveWorkoutModalProps) {
+export function SaveWorkoutModal({ isOpen, onClose, workout, onSaved, editingId, editingName }: SaveWorkoutModalProps) {
   const { user } = useAuth();
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,14 +22,22 @@ export function SaveWorkoutModal({ isOpen, onClose, workout, onSaved, editingId 
 
   const isEditing = !!editingId;
 
-  // Pre-fill name when editing
+  // Pre-fill name when editing or when using a preset
   useEffect(() => {
-    if (isOpen && workout.name && !workout.name.startsWith("Custom")) {
-      setName(workout.name);
-    } else if (!isOpen) {
+    if (isOpen) {
+      if (editingName) {
+        // When editing an existing workout, use the original name
+        setName(editingName);
+      } else if (workout.name && !workout.name.startsWith("Custom")) {
+        // When saving a preset as a new workout
+        setName(workout.name);
+      } else {
+        setName("");
+      }
+    } else {
       setName("");
     }
-  }, [isOpen, workout.name]);
+  }, [isOpen, workout.name, editingName]);
 
   if (!isOpen || !user) return null;
 
@@ -50,7 +59,7 @@ export function SaveWorkoutModal({ isOpen, onClose, workout, onSaved, editingId 
     }
 
     if (result) {
-      onSaved();
+      onSaved(result.id, name.trim());
       setName("");
       onClose();
     } else {

@@ -16,11 +16,11 @@ interface TimerDisplayProps {
   totalExercises?: number;
 }
 
-export function TimerDisplay({ 
-  seconds, 
-  phase, 
-  currentInterval, 
-  totalIntervals, 
+export function TimerDisplay({
+  seconds,
+  phase,
+  currentInterval,
+  totalIntervals,
   exerciseName,
   isCircuit,
   currentRound,
@@ -91,6 +91,7 @@ export function TimerDisplay({
           )}
         </div>
       )}
+
     </div>
   );
 }

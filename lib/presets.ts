@@ -141,6 +141,31 @@ export function getExerciseName(config: WorkoutConfig, exerciseIndex: number): s
   return null;
 }
 
+export function getNextExerciseName(config: WorkoutConfig, currentInterval: number): string | null {
+  if (!config.exerciseNames || config.exerciseNames.length === 0) {
+    return null;
+  }
+
+  const nextInterval = currentInterval + 1;
+
+  // Check if there's a next interval
+  if (nextInterval > config.rounds) {
+    return null;
+  }
+
+  if (config.isCircuit && config.exercises) {
+    // For circuit mode, cycle through exercise names
+    const idx = (nextInterval - 1) % config.exercises;
+    return config.exerciseNames[idx] || null;
+  }
+
+  // For regular mode
+  if (nextInterval <= config.exerciseNames.length) {
+    return config.exerciseNames[nextInterval - 1] || null;
+  }
+  return null;
+}
+
 export function getCurrentRoundInCircuit(config: WorkoutConfig, intervalIndex: number): number {
   if (!config.isCircuit || !config.exercises) return 1;
   return Math.floor((intervalIndex - 1) / config.exercises) + 1;

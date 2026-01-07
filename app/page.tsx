@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PRESETS, WorkoutConfig, createCustomWorkout, formatTime, getTotalWorkoutTime } from "@/lib/presets";
-import { getHistory, WorkoutRecord, formatDuration, formatRelativeTime } from "@/lib/history";
+import { getHistory, WorkoutRecord, formatDuration, formatRelativeTime, historyRecordToConfig } from "@/lib/history";
 import { getSavedWorkouts, deleteWorkout, savedWorkoutToConfig } from "@/lib/savedWorkouts";
 import { SavedWorkout } from "@/lib/database.types";
 import { PresetCard } from "@/components/PresetCard";
@@ -36,6 +36,7 @@ export default function HomePage() {
   const [showExerciseNames, setShowExerciseNames] = useState(false);
   const [history, setHistory] = useState<WorkoutRecord[]>([]);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
+  const [editingWorkoutName, setEditingWorkoutName] = useState<string | null>(null);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -139,6 +140,7 @@ export default function HomePage() {
 
   const handleEditSavedWorkout = (saved: SavedWorkout) => {
     const config = savedWorkoutToConfig(saved);
+    setEditingWorkoutName(saved.name);
     loadIntoCustomForm(config, saved.id);
   };
 
@@ -470,6 +472,7 @@ export default function HomePage() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setEditingWorkoutId(null);
+                    setEditingWorkoutName(null);
                     setIsCircuitMode(false);
                     setCustomWork(30);
                     setCustomRest(15);
@@ -509,25 +512,42 @@ export default function HomePage() {
           </h2>
           <div className="space-y-3">
             {history.slice(0, 5).map((record) => (
-              <div
+              <button
                 key={record.id}
-                className="flex items-center justify-between p-4 rounded-xl bg-card border border-border"
+                onClick={() => {
+                  const config = historyRecordToConfig(record);
+                  setSelectedPreset(config);
+                  setShowCustom(false);
+                  setEditingWorkoutId(null);
+                }}
+                className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all text-left ${
+                  selectedPreset?.id === `history-${record.id}`
+                    ? "bg-accent/20 border-accent ring-4 ring-accent/40"
+                    : "bg-card border-border hover:border-accent/50 hover:bg-accent/5"
+                }`}
               >
                 <div>
-                  <span className="font-semibold text-foreground">{record.presetName}</span>
+                  <span className={`font-semibold ${selectedPreset?.id === `history-${record.id}` ? "text-accent" : "text-foreground"}`}>
+                    {record.presetName}
+                  </span>
                   <span className="text-xs text-muted-foreground ml-2">
                     {record.workSeconds}s/{record.restSeconds}s × {record.rounds}
                   </span>
                 </div>
-                <div className="text-right">
-                  <span className="font-mono text-sm text-foreground">
-                    {formatDuration(record.totalTime)}
-                  </span>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    {formatRelativeTime(record.completedAt)}
-                  </span>
+                <div className="text-right flex items-center gap-3">
+                  <div>
+                    <span className="font-mono text-sm text-foreground">
+                      {formatDuration(record.totalTime)}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      {formatRelativeTime(record.completedAt)}
+                    </span>
+                  </div>
+                  <svg className={`w-5 h-5 ${selectedPreset?.id === `history-${record.id}` ? "text-accent" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>
@@ -560,11 +580,21 @@ export default function HomePage() {
           isOpen={showSaveModal}
           onClose={() => setShowSaveModal(false)}
           workout={selectedPreset}
-          onSaved={() => {
-            fetchSavedWorkouts();
+          onSaved={async (savedId, savedName) => {
+            await fetchSavedWorkouts();
+            // Select the newly saved/updated workout
+            const config = {
+              ...selectedPreset,
+              id: `saved-${savedId}`,
+              name: savedName,
+            };
+            setSelectedPreset(config);
+            setShowCustom(false);
             setEditingWorkoutId(null);
+            setEditingWorkoutName(null);
           }}
           editingId={editingWorkoutId}
+          editingName={editingWorkoutName}
         />
       )}
     </main>

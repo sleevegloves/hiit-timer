@@ -71,3 +71,14 @@ export function formatRelativeTime(isoDate: string): string {
   return date.toLocaleDateString();
 }
 
+export function historyRecordToConfig(record: WorkoutRecord) {
+  return {
+    id: `history-${record.id}`,
+    name: record.presetName,
+    description: `${record.workSeconds}s work / ${record.restSeconds}s rest × ${record.rounds}`,
+    workSeconds: record.workSeconds,
+    restSeconds: record.restSeconds,
+    rounds: record.rounds,
+  };
+}
+

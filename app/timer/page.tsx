@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { WorkoutConfig, getExerciseName, getTotalWorkoutTime } from "@/lib/presets";
+import { WorkoutConfig, getExerciseName, getNextExerciseName, getTotalWorkoutTime } from "@/lib/presets";
 import { addWorkoutToHistory } from "@/lib/history";
 import { useTimer, Phase } from "@/hooks/useTimer";
 import { useAudio } from "@/hooks/useAudio";
@@ -13,7 +13,7 @@ import { Controls } from "@/components/Controls";
 export default function TimerPage() {
   const router = useRouter();
   const [config, setConfig] = useState<WorkoutConfig | null>(null);
-  const [workoutSaved, setWorkoutSaved] = useState(false);
+  const workoutSavedRef = useRef(false);
 
   const audio = useAudio();
 
@@ -43,7 +43,8 @@ export default function TimerPage() {
   );
 
   const handleComplete = useCallback(() => {
-    if (config && !workoutSaved) {
+    if (config && !workoutSavedRef.current) {
+      workoutSavedRef.current = true;
       const totalTime = getTotalWorkoutTime(config);
       addWorkoutToHistory(
         config.name,
@@ -52,9 +53,8 @@ export default function TimerPage() {
         config.rounds,
         totalTime
       );
-      setWorkoutSaved(true);
     }
-  }, [config, workoutSaved]);
+  }, [config]);
 
   const timer = useTimer(config, {
     onPhaseChange: handlePhaseChange,
@@ -82,7 +82,7 @@ export default function TimerPage() {
   };
 
   const handleReset = () => {
-    setWorkoutSaved(false);
+    workoutSavedRef.current = false;
     timer.reset();
   };
 
@@ -129,6 +129,7 @@ export default function TimerPage() {
   }
 
   const exerciseName = getExerciseName(config, timer.currentInterval);
+  const nextExerciseName = getNextExerciseName(config, timer.currentInterval);
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-6">
@@ -160,7 +161,7 @@ export default function TimerPage() {
 
       {/* Progress dots */}
       {timer.phase !== "idle" && timer.phase !== "complete" && (
-        <div className="mb-8">
+        <div className="mb-6">
           {config.isCircuit && config.exercises && config.totalRounds ? (
             // Circuit mode: show exercise dots for current round
             <div className="flex flex-col items-center gap-2">
@@ -215,6 +216,14 @@ export default function TimerPage() {
         </div>
       )}
 
+      {/* Up next exercise preview */}
+      {nextExerciseName && timer.phase !== "idle" && timer.phase !== "complete" && timer.phase !== "countdown" && (
+        <div className="mb-6 flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Up next:</span>
+          <span className="font-semibold text-foreground">{nextExerciseName}</span>
+        </div>
+      )}
+
       <Controls
         phase={timer.phase}
         isRunning={timer.isRunning}
@@ -227,7 +236,7 @@ export default function TimerPage() {
         <div className="mt-8 text-center">
           <p className="text-2xl font-bold text-accent mb-2">Great workout!</p>
           <p className="text-muted-foreground">
-            {config.isCircuit 
+            {config.isCircuit
               ? `${config.totalRounds} rounds × ${config.exercises} exercises completed`
               : `${config.rounds} rounds completed`
             }

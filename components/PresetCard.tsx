@@ -70,16 +70,16 @@ export function PresetCard({
         )}
       </div>
 
-      {/* Action buttons row - shows on hover */}
+      {/* Action buttons row - always visible on touch devices, hover on desktop */}
       {hasActions && (
-        <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-border/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           {onUseAsTemplate && (
             <div
               onClick={(e) => {
                 e.stopPropagation();
                 onUseAsTemplate(preset);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg hover:bg-accent/10 hover:text-accent transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/5 text-muted-foreground sm:bg-transparent hover:bg-accent/10 hover:text-accent transition-all cursor-pointer active:scale-95"
               title="Use as template"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -94,7 +94,7 @@ export function PresetCard({
                 e.stopPropagation();
                 onEdit();
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg hover:bg-accent/10 hover:text-accent transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/5 text-muted-foreground sm:bg-transparent hover:bg-accent/10 hover:text-accent transition-all cursor-pointer active:scale-95"
               title="Edit"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -109,7 +109,7 @@ export function PresetCard({
                 e.stopPropagation();
                 onDelete();
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-500/5 text-muted-foreground sm:bg-transparent hover:bg-red-500/10 hover:text-red-500 transition-all cursor-pointer active:scale-95"
               title="Delete"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
