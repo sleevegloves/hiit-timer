@@ -230,7 +230,7 @@ export async function getPublicWorkouts(
   }
 
   // Get unique owner IDs and fetch profiles
-  const ownerIds = [...new Set(filteredWorkouts.map((w) => w.user_id))];
+  const ownerIds = Array.from(new Set(filteredWorkouts.map((w) => w.user_id)));
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, username, display_name")
@@ -292,7 +292,7 @@ export async function searchPublicWorkouts(
   if (!workouts?.length) return [];
 
   // Get profiles
-  const ownerIds = [...new Set(workouts.map((w) => w.user_id))];
+  const ownerIds = Array.from(new Set(workouts.map((w) => w.user_id)));
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, username, display_name")
@@ -495,7 +495,7 @@ export async function getSavedCommunityWorkouts(userId: string): Promise<SavedCo
   }
 
   // Get unique owner IDs and fetch their profiles
-  const ownerIds = [...new Set(workouts.map((w) => w.user_id))];
+  const ownerIds = Array.from(new Set(workouts.map((w) => w.user_id)));
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
     .select("id, username, display_name")
