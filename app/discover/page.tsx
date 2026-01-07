@@ -92,7 +92,7 @@ export default function DiscoverPage() {
     fetchWorkouts();
   };
 
-  const handleStartWorkout = (workout: SavedWorkout) => {
+  const handleStartWorkout = (workout: PublicWorkoutWithProfile) => {
     const config = savedWorkoutToConfig(workout);
     sessionStorage.setItem("hiit-workout-config", JSON.stringify(config));
     router.push("/timer");
