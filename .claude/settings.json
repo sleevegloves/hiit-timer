@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init)",
+      "Bash(git add CLAUDE.md .claude/)",
+      "Bash(git commit -m \"Add swarm development infrastructure \\(CLAUDE.md, agent prompts, workflow\\)\")",
+      "Bash(gh auth status)",
+      "Bash(gh auth switch --user sleevegloves)",
+      "Bash(gh repo list sleevegloves --limit 20)",
+      "Bash(gh repo view sleevegloves/hiit-timer --json name,description,defaultBranchRef,pushedAt)",
+      "Bash(gh api repos/sleevegloves/hiit-timer/contents/)",
+      "Bash(python3 -c \"import sys,json; [print\\(f[''name'']\\) for f in json.load\\(sys.stdin\\)]\")",
+      "Bash(git reset origin/main)",
+      "Bash(ls ~/hiit-timer*)",
+      "Read(//Users/wesleymarr/hiit-timer-v2/**)"
+    ]
+  }
+}
